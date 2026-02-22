@@ -53,7 +53,3 @@ The prompts used to build this project, starting in Claude Chat and continuing i
 22. let's update the output PDF to include two sets each with a corresponding backside page to be the back of the card. this should be ordered so I can do two-sided printing on the same page. use the blue and red examples from this image for the card backside https://whistle-stop.com/wp-content/uploads/2024/04/hasbro_guess-who-card-game_02-1400x513.jpg
 
 23. let's change the image of the backside to be a mix of semi-opaque question marks scattered around in different orientations
-
-24. create PROMPT.md with the prompts used in this session
-
-25. I have other prompts I started with in Claude Chat. Can you add these at the start?

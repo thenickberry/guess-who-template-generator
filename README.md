@@ -4,18 +4,40 @@ Generates a printable PDF of custom Guess Who cards from a folder of images.
 
 ## Requirements
 
+**macOS / Linux**
+```bash
+pip3 install reportlab pillow pyyaml
 ```
+
+**Windows**
+```bash
 pip install reportlab pillow pyyaml
 ```
 
 ## Usage
 
+**macOS / Linux**
+```bash
+# Generate cards from a folder of images
+python3 generate.py ./photos
+
+# Use a custom config file
+python3 generate.py ./photos --config my_config.yaml
+
+# Specify output filename
+python3 generate.py ./photos --output my_cards.pdf
+
+# Write a default config file to customize
+python3 generate.py --generate-config my_config.yaml
+```
+
+**Windows**
 ```bash
 # Generate cards from a folder of images
 python generate.py ./photos
 
 # Use a custom config file
-python generate.py ./photos --config example.config
+python generate.py ./photos --config my_config.yaml
 
 # Specify output filename
 python generate.py ./photos --output my_cards.pdf

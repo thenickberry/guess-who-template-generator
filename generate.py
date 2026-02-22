@@ -147,6 +147,15 @@ DEFAULT_CONFIG = {
     },
     "game": {
         "max_cards": 24,
+        "sets": 2,
+    },
+    "card_back": {
+        "set_colors": [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18]],
+        "frame_color": [1.0, 1.0, 1.0],
+        "frame_width": 1.5,
+        "frame_margin": 0.07,
+        "qm_color": [1.0, 1.0, 1.0],
+        "qm_alpha": 0.30,
     },
     "image_extensions": [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp"],
 }
@@ -203,6 +212,18 @@ crop_marks:
 # --- Game settings ---
 game:
   max_cards: 24                            # standard Guess Who character count
+  sets: 2                                  # number of identical sets to produce
+
+# --- Card back ---
+card_back:
+  set_colors:                              # one color per set (RGB)
+    - [0.18, 0.38, 0.72]                  # set 1: blue
+    - [0.72, 0.18, 0.18]                  # set 2: red
+  frame_color: [1.0, 1.0, 1.0]            # white
+  frame_width: 1.5                         # points
+  frame_margin: 0.07                       # inches from card edge to frame
+  qm_color: [1.0, 1.0, 1.0]              # question mark color
+  qm_alpha: 0.30                           # question mark opacity (0.0–1.0)
 
 # --- Supported image formats ---
 image_extensions:
@@ -390,12 +411,83 @@ def collect_images(image_dir, cfg):
     return images
 
 
+def draw_card_back(c, x, y, bg_color, cfg):
+    """Draw the back of a Guess Who card at (x, y) bottom-left."""
+    card_w = cfg["card"]["width"] * inch
+    card_h = cfg["card"]["height"] * inch
+    cb = cfg.get("card_back", {})
+
+    frame_color = color_from_list(cb.get("frame_color", [1.0, 1.0, 1.0]))
+    frame_width = cb.get("frame_width", 1.5)
+    frame_margin = cb.get("frame_margin", 0.07) * inch
+    qm_col = cb.get("qm_color", [1.0, 1.0, 1.0])
+    qm_alpha = cb.get("qm_alpha", 0.30)
+    qm_font = cfg["name_label"]["font"]
+
+    # Background
+    c.setFillColor(bg_color)
+    c.rect(x, y, card_w, card_h, fill=1, stroke=0)
+
+    # Scattered question marks — clipped to card bounds
+    # Each entry: (x_frac, y_frac, angle_degrees, font_size)
+    scatter = [
+        (0.10, 0.90, 20,  16),
+        (0.42, 0.93, -8,  11),
+        (0.75, 0.85, 38,  14),
+        (0.05, 0.65, -30, 20),
+        (0.58, 0.70, 12,  13),
+        (0.88, 0.60, -22, 17),
+        (0.25, 0.50,  0,  22),
+        (0.72, 0.45, -40, 12),
+        (0.48, 0.50, 55,  10),
+        (0.15, 0.30, 28,  15),
+        (0.80, 0.28, -15, 19),
+        (0.38, 0.18, -50, 13),
+        (0.65, 0.10, 18,  16),
+        (0.90, 0.08, -28, 11),
+        (0.20, 0.08, 42,  14),
+    ]
+
+    c.saveState()
+    clip = c.beginPath()
+    clip.rect(x, y, card_w, card_h)
+    c.clipPath(clip, stroke=0, fill=0)
+
+    c.setFillColor(Color(qm_col[0], qm_col[1], qm_col[2], qm_alpha))
+    for xf, yf, angle, size in scatter:
+        qx = x + xf * card_w
+        qy = y + yf * card_h
+        c.saveState()
+        c.translate(qx, qy)
+        c.rotate(angle)
+        c.setFont(qm_font, size)
+        c.drawCentredString(0, -size / 3, "?")
+        c.restoreState()
+
+    c.restoreState()
+
+    # Outer frame
+    c.setStrokeColor(frame_color)
+    c.setLineWidth(frame_width)
+    c.rect(x + frame_margin, y + frame_margin,
+           card_w - 2 * frame_margin, card_h - 2 * frame_margin,
+           fill=0, stroke=1)
+
+    # Crop marks
+    draw_crop_marks(c, x, y, card_w, card_h, cfg)
+
+
 # ──────────────────────────────────────────────
 # PDF generation
 # ──────────────────────────────────────────────
 
 def generate_pdf(images, output_path, cfg):
-    """Generate the Guess Who card PDF."""
+    """Generate the Guess Who card PDF.
+
+    Page order per set: front page(s) immediately followed by their back page(s),
+    so duplex printing (flip on long edge) produces correctly aligned backs.
+    Columns on back pages are mirrored so each back aligns with its front card.
+    """
     register_font(cfg["name_label"]["font"])
 
     page_w = cfg["page"]["width"] * inch
@@ -404,6 +496,10 @@ def generate_pdf(images, output_path, cfg):
     card_h = cfg["card"]["height"] * inch
     cols = cfg["card"]["columns"]
     rows = cfg["card"]["rows"]
+    num_sets = cfg["game"].get("sets", 1)
+    set_colors = cfg.get("card_back", {}).get(
+        "set_colors", [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18]]
+    )
 
     c = canvas.Canvas(output_path, pagesize=(page_w, page_h))
     c.setTitle("Guess Who - Custom Cards")
@@ -411,24 +507,38 @@ def generate_pdf(images, output_path, cfg):
     origin_x, origin_y = get_grid_origin(cfg)
     cards_per_page = cols * rows
 
-    total_cards = len(images)
-    total_pages = (total_cards + cards_per_page - 1) // cards_per_page
+    # Split images into pages once; reuse across sets
+    pages = [images[i:i + cards_per_page] for i in range(0, len(images), cards_per_page)]
+    total_pdf_pages = len(pages) * num_sets * 2
+    print(f"Generating {len(images)} cards × {num_sets} set(s) → {total_pdf_pages} pages...")
 
-    print(f"Generating {total_cards} cards across {total_pages} page(s)...")
+    first_page = True
+    for set_idx in range(num_sets):
+        back_color = color_from_list(set_colors[set_idx % len(set_colors)])
+        print(f"\nSet {set_idx + 1}:")
 
-    for idx, (img_path, name) in enumerate(images):
-        page_idx = idx % cards_per_page
-        col = page_idx % cols
-        row = page_idx // cols
+        for page_images in pages:
+            # ── Front page ──────────────────────────────────────────────
+            if not first_page:
+                c.showPage()
+            first_page = False
 
-        card_x = origin_x + col * card_w
-        card_y = origin_y - (row + 1) * card_h
+            for page_idx, (img_path, name) in enumerate(page_images):
+                col = page_idx % cols
+                row = page_idx // cols
+                card_x = origin_x + col * card_w
+                card_y = origin_y - (row + 1) * card_h
+                draw_card(c, card_x, card_y, img_path, name, cfg)
+                print(f"  [front] {name}")
 
-        draw_card(c, card_x, card_y, img_path, name, cfg)
-        print(f"  [{idx + 1}/{total_cards}] {name}")
-
-        if page_idx == cards_per_page - 1 and idx < total_cards - 1:
+            # ── Back page (mirror columns for duplex alignment) ──────────
             c.showPage()
+            for page_idx in range(len(page_images)):
+                col = cols - 1 - (page_idx % cols)
+                row = page_idx // cols
+                card_x = origin_x + col * card_w
+                card_y = origin_y - (row + 1) * card_h
+                draw_card_back(c, card_x, card_y, back_color, cfg)
 
     c.save()
     print(f"\nDone! Saved to: {output_path}")

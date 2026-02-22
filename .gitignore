@@ -1,0 +1,15 @@
+# Generated output
+*.pdf
+
+# Downloaded fonts (auto-fetched at runtime)
+fonts/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# macOS
+.DS_Store

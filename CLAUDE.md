@@ -7,7 +7,7 @@ A single-file Python script (`generate.py`) that generates printable Guess Who c
 ## Key Files
 
 - `generate.py` — all logic: config, font management, PDF drawing, CLI
-- `example.config` — YAML config with all available settings and their current defaults
+- `example_config` — YAML config with all available settings and their current defaults
 - `fonts/` — auto-created directory where font files are cached after first download
 
 ## Architecture
@@ -15,14 +15,14 @@ A single-file Python script (`generate.py`) that generates printable Guess Who c
 - **Config** is defined in `DEFAULT_CONFIG` (dict) and `DEFAULT_CONFIG_YAML` (string). Both must be kept in sync when defaults change.
 - **Font registration** happens via `register_font(font_name)`, called at the top of `generate_pdf()`. Built-in ReportLab fonts (Helvetica, Times, etc.) are skipped. For any other font, it looks for `fonts/{font_name}.ttf` locally, and if not found, derives a Google Fonts family name by splitting the CamelCase font name (e.g. `BodoniModa-Bold` → `"Bodoni Moda"`) and downloads the TTF, caching it to `fonts/`.
 - **Drawing** is done in `draw_card()`. Card coordinate origin is bottom-left (ReportLab convention).
-- **Image sizing**: images always fill the full available height and are center-cropped horizontally via a clip path. Portrait images show narrow; landscape images are clipped.
+- **Image sizing**: images use cover-fill — scaled so both dimensions fill the full card, with any overflow clipped. The image is centered on both axes.
 
 ## Common Tasks
 
-- **Change a default value**: update both `DEFAULT_CONFIG` dict and `DEFAULT_CONFIG_YAML` string, then sync `example.config`.
+- **Change a default value**: update both `DEFAULT_CONFIG` dict and `DEFAULT_CONFIG_YAML` string, then sync `example_config`.
 - **Change card dimensions**: `card.width` / `card.height` in inches.
 - **Change font**: update `name_label.font`. Built-in ReportLab fonts (`Helvetica`, `Helvetica-Bold`, `Times-Roman`, etc.) work with no extra steps. For a Google Font, use its CamelCase family name (e.g. `PlayfairDisplay`) — it will be downloaded automatically on first run. To use a font that can't be derived from its name alone, manually place the TTF at `fonts/{font_name}.ttf`.
-- **Add a new config key**: add to `DEFAULT_CONFIG`, `DEFAULT_CONFIG_YAML`, `example.config`, and read it in the relevant drawing function using `.get()` with a fallback for backwards compatibility.
+- **Add a new config key**: add to `DEFAULT_CONFIG`, `DEFAULT_CONFIG_YAML`, `example_config`, and read it in the relevant drawing function using `.get()` with a fallback for backwards compatibility.
 
 ## Dependencies
 

@@ -1,0 +1,92 @@
+# ============================================================
+# Guess Who Card Generator — Configuration
+# ============================================================
+# All dimensions are in inches unless noted otherwise.
+# Colors use RGB values from 0.0 to 1.0.
+# ============================================================
+
+# --- Page setup ---
+page:
+  width: 8.5
+  height: 11.0
+  margin_x: 0.5
+  margin_y: 0.5
+
+# --- Card dimensions ---
+card:
+  width: 1.5
+  height: 1.375
+  columns: 5
+  rows: 5
+  padding: 0.125                     # spacing around each card in the grid
+  background_color: [1.0, 1.0, 1.0]  # white
+
+# --- Image area ---
+image:
+  padding: 0.06                      # padding inside card around the image
+
+# --- Name label ---
+name_label:
+  height: 0.28
+  font: "Helvetica-Bold"
+  font_size: 8                       # points
+  color: [0.0, 0.0, 0.0]             # black
+  outline_color: [1.0, 1.0, 1.0]     # white outline around letters
+  outline_width: 2.0                 # outline stroke width in points (0 to disable)
+  bottom_padding: 0.2                # gap between card bottom and text baseline
+
+# --- Card border ---
+border:
+  color: [1.0, 1.0, 1.0]             # white
+  width: 0                           # points (0 to disable)
+
+# --- Crop marks (cutting guides) ---
+crop_marks:
+  enabled: true
+  length: 0.15
+  offset: 0.04                       # gap between card edge and mark
+  color: [0.4, 0.4, 0.4]             # medium gray
+  width: 0.5                         # points
+
+# --- Duplex alignment ---
+# If front and back are misaligned when printed, adjust these to compensate.
+# Positive x shifts backs to the right; positive y shifts backs up.
+# Tip: print one page, hold it to light against its back, measure the offset,
+# then set back_offset_x / back_offset_y to the opposite of what you measure.
+duplex:
+  back_offset_x: 0.0                 # inches, horizontal shift for back pages
+  back_offset_y: 0.0                 # inches, vertical shift for back pages
+
+# --- Game settings ---
+game:
+  max_cards: 24                      # standard Guess Who character count
+  sets: 2                            # number of identical sets to produce
+
+# --- Card back ---
+card_back:
+  set_colors:                        # one color per set (RGB)
+    - [0.18, 0.38, 0.72]             # set 1: blue
+    - [0.72, 0.18, 0.18]             # set 2: red
+  frame_color: [1.0, 1.0, 1.0]       # white
+  frame_width: 1.5                   # points
+  frame_margin: 0.07                 # inches from card edge to frame
+  qm_color: [1.0, 1.0, 1.0]          # question mark color
+  qm_alpha: 0.30                     # question mark opacity (0.0–1.0)
+
+# --- Supported image formats ---
+image_extensions:
+  - .png
+  - .jpg
+  - .jpeg
+  - .bmp
+  - .gif
+  - .tiff
+  - .webp
+
+# --- Image enhancement ---
+image_enhance:
+  auto_contrast: true                # normalize tonal range
+  saturation: 1.3                    # color boost (1.0 = none)
+  contrast: 1.1                      # contrast boost (1.0 = none)
+  brightness: 1.0                    # brightness (1.0 = none)
+  sharpness: 1.0                     # sharpness (1.0 = none)

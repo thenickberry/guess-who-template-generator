@@ -65,7 +65,7 @@ uncle-bob.jpg   →  Uncle Bob
 
 ## Configuration
 
-Copy `example.config` and adjust as needed. All settings are optional — any omitted values fall back to defaults.
+Copy `example_config` and adjust as needed. All settings are optional — any omitted values fall back to defaults.
 
 | Section | Key | Description |
 |---|---|---|

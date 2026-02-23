@@ -10,7 +10,7 @@ Usage:
     python guess_who_cards.py --generate-config              # dump default config
 
 Card specs (defaults, all configurable via YAML):
-    - Card size: 1.5" x 2" (matches official Guess Who)
+    - Card size: 1.25" x 1.375" (matches official Guess Who)
     - Paper size: 8.5" x 11" (US Letter)
     - Grid: 5 columns x 5 rows per page
     - Thin white border around each card
@@ -33,7 +33,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageOps
 
 
 # ──────────────────────────────────────────────
@@ -107,6 +107,31 @@ def register_font(font_name: str) -> None:
 
 
 # ──────────────────────────────────────────────
+# Image enhancement
+# ──────────────────────────────────────────────
+
+def enhance_image(img: Image.Image, cfg: dict) -> Image.Image:
+    ec = cfg.get("image_enhance", {})
+    alpha = img.split()[3] if img.mode == "RGBA" else None
+    img = img.convert("RGB")
+    if ec.get("auto_contrast", True):
+        img = ImageOps.autocontrast(img)
+    for attr, key, default in [
+        (ImageEnhance.Color,      "saturation", 1.3),
+        (ImageEnhance.Contrast,   "contrast",   1.1),
+        (ImageEnhance.Brightness, "brightness", 1.0),
+        (ImageEnhance.Sharpness,  "sharpness",  1.0),
+    ]:
+        factor = ec.get(key, default)
+        if factor != 1.0:
+            img = attr(img).enhance(factor)
+    if alpha:
+        img = img.convert("RGBA")
+        img.putalpha(alpha)
+    return img
+
+
+# ──────────────────────────────────────────────
 # Default configuration (embedded)
 # ──────────────────────────────────────────────
 
@@ -118,25 +143,28 @@ DEFAULT_CONFIG = {
         "margin_y": 0.5,
     },
     "card": {
-        "width": 1.5,
+        "width": 1.25,
         "height": 1.375,
         "columns": 5,
         "rows": 5,
+        "padding": 0.125,
         "background_color": [1.0, 1.0, 1.0],
     },
     "image": {
-        "padding": 0.06,
+        "padding": 0.0,
     },
     "name_label": {
         "height": 0.28,
         "font": "Helvetica-Bold",
         "font_size": 12,
         "color": [0.0, 0.0, 0.0],
-        "bottom_padding": 0.075,
+        "outline_color": [1.0, 1.0, 1.0],
+        "outline_width": 2.0,
+        "bottom_padding": 0.15,
     },
     "border": {
         "color": [1.0, 1.0, 1.0],
-        "width": 1.5,
+        "width": 0,
     },
     "crop_marks": {
         "enabled": True,
@@ -149,6 +177,10 @@ DEFAULT_CONFIG = {
         "max_cards": 24,
         "sets": 2,
     },
+    "duplex": {
+        "back_offset_x": 0.0,
+        "back_offset_y": 0.0,
+    },
     "card_back": {
         "set_colors": [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18]],
         "frame_color": [1.0, 1.0, 1.0],
@@ -158,6 +190,13 @@ DEFAULT_CONFIG = {
         "qm_alpha": 0.30,
     },
     "image_extensions": [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp"],
+    "image_enhance": {
+        "auto_contrast": True,
+        "saturation": 1.3,
+        "contrast": 1.1,
+        "brightness": 1.0,
+        "sharpness": 1.0,
+    },
 }
 
 # Nicely formatted YAML template for --generate-config
@@ -182,6 +221,7 @@ card:
   height: 1.375
   columns: 5
   rows: 5
+  padding: 0.125                           # spacing around each card in the grid
   background_color: [1.0, 1.0, 1.0]   # white
 
 # --- Image area ---
@@ -194,12 +234,14 @@ name_label:
   font: "Helvetica-Bold"
   font_size: 8                            # points
   color: [0.0, 0.0, 0.0]                  # black
-  bottom_padding: 0.075                   # gap between card bottom and text baseline
+  outline_color: [1.0, 1.0, 1.0]          # white outline around letters
+  outline_width: 2.0                      # outline stroke width in points (0 to disable)
+  bottom_padding: 0.15                    # gap between card bottom and text baseline
 
 # --- Card border ---
 border:
   color: [1.0, 1.0, 1.0]                  # white
-  width: 1.5                              # points
+  width: 0                                # points (0 to disable)
 
 # --- Crop marks (cutting guides) ---
 crop_marks:
@@ -209,10 +251,19 @@ crop_marks:
   color: [0.4, 0.4, 0.4]                  # medium gray
   width: 0.5                              # points
 
+# --- Duplex alignment ---
+# If front and back are misaligned when printed, adjust these to compensate.
+# Positive x shifts backs to the right; positive y shifts backs up.
+# Tip: print one page, hold it to light against its back, measure the offset,
+# then set back_offset_x / back_offset_y to the opposite of what you measure.
+duplex:
+  back_offset_x: 0.0              # inches, horizontal shift for back pages
+  back_offset_y: 0.0              # inches, vertical shift for back pages
+
 # --- Game settings ---
 game:
-  max_cards: 24                            # standard Guess Who character count
-  sets: 2                                  # number of identical sets to produce
+  max_cards: 24                           # standard Guess Who character count
+  sets: 2                                 # number of identical sets to produce
 
 # --- Card back ---
 card_back:
@@ -234,6 +285,14 @@ image_extensions:
   - .gif
   - .tiff
   - .webp
+
+# --- Image enhancement ---
+image_enhance:
+  auto_contrast: true          # normalize tonal range
+  saturation: 1.3              # color boost (1.0 = none)
+  contrast: 1.1                # contrast boost (1.0 = none)
+  brightness: 1.0              # brightness (1.0 = none)
+  sharpness: 1.0               # sharpness (1.0 = none)
 """
 
 
@@ -282,13 +341,16 @@ def get_grid_origin(cfg):
     """Calculate top-left origin so the card grid is centered on the page."""
     card_w = cfg["card"]["width"] * inch
     card_h = cfg["card"]["height"] * inch
+    pad = cfg["card"].get("padding", 0.0) * inch
     page_w = cfg["page"]["width"] * inch
     page_h = cfg["page"]["height"] * inch
     cols = cfg["card"]["columns"]
     rows = cfg["card"]["rows"]
 
-    grid_width = cols * card_w
-    grid_height = rows * card_h
+    cell_w = card_w + 2 * pad
+    cell_h = card_h + 2 * pad
+    grid_width = cols * cell_w
+    grid_height = rows * cell_h
     origin_x = (page_w - grid_width) / 2
     origin_y = page_h - (page_h - grid_height) / 2
     return origin_x, origin_y
@@ -326,34 +388,35 @@ def draw_card(c, x, y, image_path, name, cfg):
     label_font = cfg["name_label"]["font"]
     label_size = cfg["name_label"]["font_size"]
     label_color = color_from_list(cfg["name_label"]["color"])
-    label_bottom_pad = cfg["name_label"].get("bottom_padding", 0.04) * inch
+    label_bottom_pad = cfg["name_label"].get("bottom_padding", 0.2) * inch
 
     # Card background
     c.setFillColor(color_from_list(cfg["card"]["background_color"]))
     c.rect(x, y, card_w, card_h, fill=1, stroke=0)
 
-    # --- Image area ---
-    img_x = x + img_pad
-    img_y = y + label_h + img_pad
-    img_max_w = card_w - 2 * img_pad
-    img_max_h = card_h - label_h - 2 * img_pad
+    # --- Image area (full card) ---
+    img_x = x
+    img_y = y
+    img_max_w = card_w
+    img_max_h = card_h
 
     try:
-        pil_img = Image.open(image_path)
+        pil_img = enhance_image(Image.open(image_path), cfg)
         pil_w, pil_h = pil_img.size
         aspect = pil_w / pil_h
 
-        # Always fill the full available height; clip any horizontal overflow
-        draw_h = img_max_h
-        draw_w = img_max_h * aspect
+        # Cover fill: scale so image fills the full card in both dimensions, clipping overflow
+        scale = max(img_max_w / pil_w, img_max_h / pil_h)
+        draw_w = pil_w * scale
+        draw_h = pil_h * scale
         draw_x = img_x + (img_max_w - draw_w) / 2
-        draw_y = img_y  # anchored to bottom of image area
+        draw_y = img_y + (img_max_h - draw_h) / 2
 
         c.saveState()
         clip = c.beginPath()
         clip.rect(img_x, img_y, img_max_w, img_max_h)
         c.clipPath(clip, stroke=0, fill=0)
-        c.drawImage(ImageReader(image_path), draw_x, draw_y, draw_w, draw_h,
+        c.drawImage(ImageReader(pil_img), draw_x, draw_y, draw_w, draw_h,
                     preserveAspectRatio=False, mask='auto')
         c.restoreState()
     except Exception as e:
@@ -365,7 +428,8 @@ def draw_card(c, x, y, image_path, name, cfg):
         print(f"  Warning: Could not load image: {image_path} ({e})")
 
     # --- Name label ---
-    c.setFillColor(label_color)
+    label_outline_color = color_from_list(cfg["name_label"].get("outline_color", [1.0, 1.0, 1.0]))
+    label_outline_width = cfg["name_label"].get("outline_width", 2.0)
     c.setFont(label_font, label_size)
     display_name = name
     max_text_w = card_w - 2 * img_pad
@@ -374,6 +438,21 @@ def draw_card(c, x, y, image_path, name, cfg):
         if len(display_name) <= 1:
             break
     label_y = y + label_bottom_pad + (label_size / 3)
+    label_x = x + card_w / 2 - c.stringWidth(display_name, label_font, label_size) / 2
+
+    # Outline pass (stroke only)
+    c.saveState()
+    c.setStrokeColor(label_outline_color)
+    c.setLineWidth(label_outline_width)
+    t = c.beginText(label_x, label_y)
+    t.setTextRenderMode(1)  # stroke only
+    t.setFont(label_font, label_size)
+    t.textLine(display_name)
+    c.drawText(t)
+    c.restoreState()
+
+    # Fill pass
+    c.setFillColor(label_color)
     c.drawCentredString(x + card_w / 2, label_y, display_name)
 
     # --- Border ---
@@ -496,6 +575,9 @@ def generate_pdf(images, output_path, cfg):
     card_h = cfg["card"]["height"] * inch
     cols = cfg["card"]["columns"]
     rows = cfg["card"]["rows"]
+    pad = cfg["card"].get("padding", 0.0) * inch
+    cell_w = card_w + 2 * pad
+    cell_h = card_h + 2 * pad
     num_sets = cfg["game"].get("sets", 1)
     set_colors = cfg.get("card_back", {}).get(
         "set_colors", [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18]]
@@ -526,18 +608,21 @@ def generate_pdf(images, output_path, cfg):
             for page_idx, (img_path, name) in enumerate(page_images):
                 col = page_idx % cols
                 row = page_idx // cols
-                card_x = origin_x + col * card_w
-                card_y = origin_y - (row + 1) * card_h
+                card_x = origin_x + col * cell_w + pad
+                card_y = origin_y - (row + 1) * cell_h + pad
                 draw_card(c, card_x, card_y, img_path, name, cfg)
                 print(f"  [front] {name}")
 
             # ── Back page (mirror columns for duplex alignment) ──────────
             c.showPage()
+            duplex = cfg.get("duplex", {})
+            back_offset_x = duplex.get("back_offset_x", 0.0) * inch
+            back_offset_y = duplex.get("back_offset_y", 0.0) * inch
             for page_idx in range(len(page_images)):
                 col = cols - 1 - (page_idx % cols)
                 row = page_idx // cols
-                card_x = origin_x + col * card_w
-                card_y = origin_y - (row + 1) * card_h
+                card_x = origin_x + col * cell_w + pad + back_offset_x
+                card_y = origin_y - (row + 1) * cell_h + pad + back_offset_y
                 draw_card_back(c, card_x, card_y, back_color, cfg)
 
     c.save()

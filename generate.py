@@ -147,7 +147,7 @@ DEFAULT_CONFIG = {
         "height": 1.375,
         "columns": 5,
         "rows": 5,
-        "padding": 0.125,
+        "padding": 0.0,
         "background_color": [1.0, 1.0, 1.0],
     },
     "image": {
@@ -160,7 +160,7 @@ DEFAULT_CONFIG = {
         "color": [0.0, 0.0, 0.0],
         "outline_color": [1.0, 1.0, 1.0],
         "outline_width": 2.0,
-        "bottom_padding": 0.15,
+        "bottom_padding": 0.2,
     },
     "border": {
         "color": [1.0, 1.0, 1.0],
@@ -175,20 +175,21 @@ DEFAULT_CONFIG = {
     },
     "game": {
         "max_cards": 24,
-        "sets": 2,
+        "sets": 3,
     },
     "duplex": {
         "back_offset_x": 0.0,
         "back_offset_y": 0.0,
     },
     "card_back": {
-        "set_colors": [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18]],
+        "set_colors": [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18], [1.0, 0.85, 0.0]],
         "frame_color": [1.0, 1.0, 1.0],
         "frame_width": 1.5,
         "frame_margin": 0.07,
         "qm_color": [1.0, 1.0, 1.0],
         "qm_alpha": 0.30,
     },
+    "set_overrides": [{}, {}, {"card": {"width": 1.75, "height": 3.0, "columns": 4, "rows": 3}, "name_label": {"font_size": 18, "bottom_padding": 0.4}, "card_back": {"qm_color": [0.6, 0.5, 0.0], "qm_alpha": 0.40}}],
     "image_extensions": [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".webp"],
     "image_enhance": {
         "auto_contrast": True,
@@ -221,7 +222,7 @@ card:
   height: 1.375
   columns: 5
   rows: 5
-  padding: 0.125                           # spacing around each card in the grid
+  padding: 0.0                              # spacing around each card in the grid
   background_color: [1.0, 1.0, 1.0]   # white
 
 # --- Image area ---
@@ -236,7 +237,7 @@ name_label:
   color: [0.0, 0.0, 0.0]                  # black
   outline_color: [1.0, 1.0, 1.0]          # white outline around letters
   outline_width: 2.0                      # outline stroke width in points (0 to disable)
-  bottom_padding: 0.15                    # gap between card bottom and text baseline
+  bottom_padding: 0.2                     # gap between card bottom and text baseline
 
 # --- Card border ---
 border:
@@ -263,18 +264,38 @@ duplex:
 # --- Game settings ---
 game:
   max_cards: 24                           # standard Guess Who character count
-  sets: 2                                 # number of identical sets to produce
+  sets: 3                                 # number of sets to produce
 
 # --- Card back ---
 card_back:
   set_colors:                              # one color per set (RGB)
     - [0.18, 0.38, 0.72]                  # set 1: blue
     - [0.72, 0.18, 0.18]                  # set 2: red
+    - [1.0, 0.85, 0.0]                    # set 3: yellow
   frame_color: [1.0, 1.0, 1.0]            # white
   frame_width: 1.5                         # points
   frame_margin: 0.07                       # inches from card edge to frame
   qm_color: [1.0, 1.0, 1.0]              # question mark color
   qm_alpha: 0.30                           # question mark opacity (0.0–1.0)
+
+# --- Per-set overrides ---
+# Each entry overrides config for that set (0-indexed).
+# Unspecified keys inherit from the top-level defaults.
+set_overrides:
+  - {}                                       # set 1: use defaults
+  - {}                                       # set 2: use defaults
+  - card:                                    # set 3: larger cards
+      width: 1.75
+      height: 3.0
+      columns: 4
+      rows: 3
+    name_label:
+      font_size: 18
+      outline_width: 3.0
+      bottom_padding: 0.4
+    card_back:
+      qm_color: [0.6, 0.5, 0.0]             # dark gold (visible on yellow)
+      qm_alpha: 0.40
 
 # --- Supported image formats ---
 image_extensions:
@@ -566,38 +587,49 @@ def generate_pdf(images, output_path, cfg):
     Page order per set: front page(s) immediately followed by their back page(s),
     so duplex printing (flip on long edge) produces correctly aligned backs.
     Columns on back pages are mirrored so each back aligns with its front card.
+
+    Each set may override card dimensions via cfg["set_overrides"].
     """
     register_font(cfg["name_label"]["font"])
 
     page_w = cfg["page"]["width"] * inch
     page_h = cfg["page"]["height"] * inch
-    card_w = cfg["card"]["width"] * inch
-    card_h = cfg["card"]["height"] * inch
-    cols = cfg["card"]["columns"]
-    rows = cfg["card"]["rows"]
-    pad = cfg["card"].get("padding", 0.0) * inch
-    cell_w = card_w + 2 * pad
-    cell_h = card_h + 2 * pad
     num_sets = cfg["game"].get("sets", 1)
     set_colors = cfg.get("card_back", {}).get(
         "set_colors", [[0.18, 0.38, 0.72], [0.72, 0.18, 0.18]]
     )
+    set_overrides = cfg.get("set_overrides", [])
 
     c = canvas.Canvas(output_path, pagesize=(page_w, page_h))
     c.setTitle("Guess Who - Custom Cards")
 
-    origin_x, origin_y = get_grid_origin(cfg)
-    cards_per_page = cols * rows
-
-    # Split images into pages once; reuse across sets
-    pages = [images[i:i + cards_per_page] for i in range(0, len(images), cards_per_page)]
-    total_pdf_pages = len(pages) * num_sets * 2
+    # Count total pages across all sets (each may have different grid sizes)
+    total_pdf_pages = 0
+    for set_idx in range(num_sets):
+        eff = deep_merge(cfg, set_overrides[set_idx]) if set_idx < len(set_overrides) and set_overrides[set_idx] else cfg
+        cpp = eff["card"]["columns"] * eff["card"]["rows"]
+        total_pdf_pages += ((len(images) + cpp - 1) // cpp) * 2
     print(f"Generating {len(images)} cards × {num_sets} set(s) → {total_pdf_pages} pages...")
 
     first_page = True
     for set_idx in range(num_sets):
+        # Build effective config for this set
+        eff = deep_merge(cfg, set_overrides[set_idx]) if set_idx < len(set_overrides) and set_overrides[set_idx] else cfg
+
         back_color = color_from_list(set_colors[set_idx % len(set_colors)])
-        print(f"\nSet {set_idx + 1}:")
+        card_w = eff["card"]["width"] * inch
+        card_h = eff["card"]["height"] * inch
+        cols = eff["card"]["columns"]
+        rows = eff["card"]["rows"]
+        pad = eff["card"].get("padding", 0.0) * inch
+        cell_w = card_w + 2 * pad
+        cell_h = card_h + 2 * pad
+        cards_per_page = cols * rows
+
+        origin_x, origin_y = get_grid_origin(eff)
+        pages = [images[i:i + cards_per_page] for i in range(0, len(images), cards_per_page)]
+
+        print(f"\nSet {set_idx + 1} ({eff['card']['width']}\" × {eff['card']['height']}\"):")
 
         for page_images in pages:
             # ── Front page ──────────────────────────────────────────────
@@ -610,12 +642,12 @@ def generate_pdf(images, output_path, cfg):
                 row = page_idx // cols
                 card_x = origin_x + col * cell_w + pad
                 card_y = origin_y - (row + 1) * cell_h + pad
-                draw_card(c, card_x, card_y, img_path, name, cfg)
+                draw_card(c, card_x, card_y, img_path, name, eff)
                 print(f"  [front] {name}")
 
             # ── Back page (mirror columns for duplex alignment) ──────────
             c.showPage()
-            duplex = cfg.get("duplex", {})
+            duplex = eff.get("duplex", {})
             back_offset_x = duplex.get("back_offset_x", 0.0) * inch
             back_offset_y = duplex.get("back_offset_y", 0.0) * inch
             for page_idx in range(len(page_images)):
@@ -623,7 +655,7 @@ def generate_pdf(images, output_path, cfg):
                 row = page_idx // cols
                 card_x = origin_x + col * cell_w + pad + back_offset_x
                 card_y = origin_y - (row + 1) * cell_h + pad + back_offset_y
-                draw_card_back(c, card_x, card_y, back_color, cfg)
+                draw_card_back(c, card_x, card_y, back_color, eff)
 
     c.save()
     print(f"\nDone! Saved to: {output_path}")

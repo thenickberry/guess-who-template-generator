@@ -1,3 +1,7 @@
 name_label:
   font: "BodoniModa-Bold"
   font_size: 12
+
+duplex:
+  back_offset_x: -0.0625
+  back_offset_y: 0.0625

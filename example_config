@@ -18,7 +18,7 @@ card:
   height: 1.375
   columns: 5
   rows: 5
-  padding: 0.125                     # spacing around each card in the grid
+  padding: 0.0                        # spacing around each card in the grid
   background_color: [1.0, 1.0, 1.0]  # white
 
 # --- Image area ---
@@ -60,18 +60,38 @@ duplex:
 # --- Game settings ---
 game:
   max_cards: 24                      # standard Guess Who character count
-  sets: 2                            # number of identical sets to produce
+  sets: 3                            # number of sets to produce
 
 # --- Card back ---
 card_back:
   set_colors:                        # one color per set (RGB)
     - [0.18, 0.38, 0.72]             # set 1: blue
     - [0.72, 0.18, 0.18]             # set 2: red
+    - [1.0, 0.85, 0.0]               # set 3: yellow
   frame_color: [1.0, 1.0, 1.0]       # white
   frame_width: 1.5                   # points
   frame_margin: 0.07                 # inches from card edge to frame
   qm_color: [1.0, 1.0, 1.0]          # question mark color
   qm_alpha: 0.30                     # question mark opacity (0.0–1.0)
+
+# --- Per-set overrides ---
+# Each entry overrides config for that set (0-indexed).
+# Unspecified keys inherit from the top-level defaults.
+set_overrides:
+  - {}                                 # set 1: use defaults
+  - {}                                 # set 2: use defaults
+  - card:                              # set 3: larger cards
+      width: 1.75
+      height: 3.0
+      columns: 4
+      rows: 3
+    name_label:
+      font_size: 18
+      outline_width: 3.0
+      bottom_padding: 0.4
+    card_back:
+      qm_color: [0.6, 0.5, 0.0]       # dark gold (visible on yellow)
+      qm_alpha: 0.40
 
 # --- Supported image formats ---
 image_extensions:

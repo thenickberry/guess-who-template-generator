@@ -49,8 +49,9 @@ python generate.py --generate-config my_config.yaml
 ## Card Layout
 
 - **Paper:** 8.5" × 11" (US Letter)
-- **Card size:** 1.5" × 1.375"
-- **Grid:** 5 columns × 5 rows (25 cards per page)
+- **Sets 1 & 2:** 1.25" × 1.375" cards, 5 × 5 grid (25 per page), blue/red backs
+- **Set 3:** 1.75" × 3" cards, 4 × 3 grid (12 per page), yellow backs
+- **No padding** between cards for easy cutting
 - **Max cards:** 24 (standard Guess Who character count)
 - **Crop marks** included for cutting guides
 
@@ -86,6 +87,9 @@ Copy `example_config` and adjust as needed. All settings are optional — any om
 | `crop_marks` | `length`, `offset` | Mark size and gap in inches |
 | `crop_marks` | `color`, `width` | Mark appearance |
 | `game` | `max_cards` | Maximum number of cards to generate |
+| `game` | `sets` | Number of sets to produce (default: 3) |
+| `card_back` | `set_colors` | List of RGB colors, one per set |
+| `set_overrides` | — | List of per-set config overrides (see `example_config`) |
 | `image_extensions` | — | List of accepted file extensions |
 
 ## Fonts
